@@ -54,9 +54,9 @@
 
 Designed for Android 13 and newer.
 
-### Add the widget
-Open Countly, tap the palette button in the top right, then **Add home-screen widget**.
-You can also long-press the home screen, open **Widgets**, and drag **Countly** out. Make it taller to show more documents.
+### Add the widgets
+Four sizes: **Next** (2×2), **Health** (4×2), **List** (4×3) and **Dashboard** (4×4). Open Countly, tap the palette button in the top right, then **Add home-screen widget** (adds the List widget).
+You can also long-press the home screen, open **Widgets**, and drag the widget you want out. Make it taller to show more documents.
 
 ## Build it yourself (no Android Studio needed)
 
@@ -73,9 +73,11 @@ The APK is built in the cloud with GitHub Actions:
 | --- | --- |
 | `www/` | The app itself: plain HTML, CSS and JavaScript with no frameworks. |
 | [Capacitor](https://capacitorjs.com) | Wraps `www/` into a real Android app. |
-| `native/` | The Java code for the home-screen widget and the bridge that sends it your data. |
-| `scripts/add-widget.js` | Adds the widget to the generated Android project during the build. |
+| `native/` | The Java code for the four home-screen widgets (`WidgetRenderer` draws the dashboards as images) and the bridge that sends them your data. |
+| `scripts/add-widget.js` | Adds the four widget sizes to the generated Android project during the build. |
 | `scripts/add-branding.js` | Adds the app icon (including the Android 13+ themed icon), the black splash screen and the black system bars. |
+| `scripts/add-signing.js` | Signs every build with the same key and gives it a rising version number, so it installs as an update and keeps your data. |
+| `signing/countly.keystore` | The fixed signing key (personal-use debug key, not for the Play Store). |
 | `.github/workflows/build.yml` | Builds the debug APK and publishes it. |
 
 ### Run it in a browser
@@ -87,7 +89,7 @@ Then open http://localhost:8000. The widget only works in the installed Android 
 
 ## Project status
 
-Countly is a debug build intended for personal use. The interface and date logic are covered by browser tests (about 90 checks across phone sizes, tablet and landscape). The widget and Android integration were built to the standard Android APIs for versions 13 to 17; please open an issue if something looks wrong on your phone and include your phone model and Android version.
+Countly is a debug build intended for personal use. The interface and date logic are covered by browser tests (about 90 checks across phone sizes, tablet and landscape). The widget drawing code is new and has only been compile-checked, so please report anything that looks off. The widget and Android integration were built to the standard Android APIs for versions 13 to 17; please open an issue if something looks wrong on your phone and include your phone model and Android version.
 
 ## Updating without losing data
 
