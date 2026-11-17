@@ -16,39 +16,40 @@ const w = (p, s) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.wri
 
 // 1. Java sources (MainActivity is replaced so it registers the bridge plugin)
 fs.mkdirSync(javaDir, { recursive: true });
-for (const f of ['CountlyWidget.java', 'WidgetBridgePlugin.java', 'MainActivity.java']) {
+for (const f of ['BaseWidget.java', 'WidgetRenderer.java', 'CountlyWidget.java', 'WidgetNext.java',
+                 'WidgetHealth.java', 'WidgetFull.java', 'WidgetBridgePlugin.java', 'MainActivity.java']) {
   fs.copyFileSync(path.join(root, 'native', f), path.join(javaDir, f));
 }
 
-// 2. Widget layout: header + 6 rows (rows are hidden/shown from code depending on widget height)
-let rows = '';
-for (let i = 1; i <= 6; i++) {
-  rows += `
-    <LinearLayout android:id="@+id/row${i}" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="5dp" android:paddingBottom="5dp" android:visibility="gone">
-        <TextView android:id="@+id/dot${i}" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="●" android:textSize="11sp" android:layout_marginEnd="10dp"/>
-        <TextView android:id="@+id/name${i}" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-            android:textColor="#E9E7EF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end"/>
-        <TextView android:id="@+id/days${i}" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textSize="15sp" android:textStyle="bold" android:layout_marginStart="8dp"/>
-    </LinearLayout>`;
-}
+// 2. Widget layout: the widgets are drawn as one bitmap (donut, rings, bars, icons) by WidgetRenderer
 w(path.join(resDir, 'layout', 'widget_countly.xml'), `<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_bg">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
-        <TextView android:id="@+id/title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-            android:text="Countly" android:textSize="17sp" android:textStyle="bold"/>
-        <TextView android:id="@+id/summary" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textSize="13sp"/>
-    </LinearLayout>${rows}
-</LinearLayout>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:id="@+id/img" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:scaleType="fitXY" android:contentDescription="Countly"/>
+</FrameLayout>
 `);
 
-// 3. Background: pure AMOLED black, rounded
+// 3. Static previews shown in the widget picker
+const sample = (title, rows) => `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_bg">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="${title}" android:textColor="#2EA8FF" android:textSize="16sp" android:textStyle="bold"/>${rows.map(([n, d, c]) => `
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="6dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="${n}" android:textColor="#F2F1F7" android:textSize="14sp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="${d}" android:textColor="${c}" android:textSize="14sp" android:textStyle="bold"/>
+    </LinearLayout>`).join('')}
+</LinearLayout>
+`;
+const R3 = [['Iqama', '23 days', '#FF4D5E'], ['Passport', '4 months', '#FFB524'], ['Insurance', '1 year', '#30E88D']];
+w(path.join(resDir, 'layout', 'widget_preview_list.xml'), sample('Countly', R3));
+w(path.join(resDir, 'layout', 'widget_preview_next.xml'), sample('Iqama', [['23', 'days left', '#FF4D5E']]));
+w(path.join(resDir, 'layout', 'widget_preview_health.xml'), sample('Health 67%', [['Valid 4', 'Renew 1', '#FFB524'], ['≤30d 1', 'Expired 0', '#FF4D5E']]));
+w(path.join(resDir, 'layout', 'widget_preview_full.xml'), sample('Countly', [...R3, ['Visa', '2 years', '#30E88D']]));
+
+// 4. Background used by previews: pure AMOLED black, rounded
 w(path.join(resDir, 'drawable', 'widget_bg.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="#000000"/>
@@ -57,42 +58,55 @@ w(path.join(resDir, 'drawable', 'widget_bg.xml'), `<?xml version="1.0" encoding=
 </shape>
 `);
 
-// 4. Widget metadata
-w(path.join(resDir, 'values', 'countly_widget_strings.xml'), `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="countly_widget_description">Your closest document deadlines at a glance.</string>
-</resources>
-`);
-w(path.join(resDir, 'xml', 'countly_widget_info.xml'), `<?xml version="1.0" encoding="utf-8"?>
+// 5. Widget metadata: four sizes
+const sizes = [
+  // [class, xml name, label, description, minW, minH, resizeW, resizeH, cellsW, cellsH, preview]
+  ['CountlyWidget', 'countly_widget_info', 'Countly List', 'Your closest deadlines with progress bars.', 250, 180, 180, 110, 4, 3, 'list'],
+  ['WidgetNext', 'countly_widget_next_info', 'Countly Next', 'A big countdown ring for your next expiry.', 110, 110, 110, 110, 2, 2, 'next'],
+  ['WidgetHealth', 'countly_widget_health_info', 'Countly Health', 'Health score donut and status counters.', 250, 110, 180, 110, 4, 2, 'health'],
+  ['WidgetFull', 'countly_widget_full_info', 'Countly Dashboard', 'Donut, 12-month timeline and upcoming deadlines.', 250, 250, 250, 180, 4, 4, 'full'],
+];
+let strings = '';
+for (const [cls, xml, label, desc, mw, mh, rw, rh, cw, ch, pv] of sizes) {
+  strings += `    <string name="${xml}_desc">${desc}</string>\n    <string name="${xml}_label">${label}</string>\n`;
+  w(path.join(resDir, 'xml', xml + '.xml'), `<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="250dp" android:minHeight="110dp"
-    android:minResizeWidth="180dp" android:minResizeHeight="110dp"
-    android:targetCellWidth="4" android:targetCellHeight="2"
+    android:minWidth="${mw}dp" android:minHeight="${mh}dp"
+    android:minResizeWidth="${rw}dp" android:minResizeHeight="${rh}dp"
+    android:targetCellWidth="${cw}" android:targetCellHeight="${ch}"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_countly"
-    android:previewLayout="@layout/widget_countly"
-    android:description="@string/countly_widget_description"
+    android:previewLayout="@layout/widget_preview_${pv}"
+    android:description="@string/${xml}_desc"
     android:widgetCategory="home_screen"/>
 `);
+}
+w(path.join(resDir, 'values', 'countly_widget_strings.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="countly_widget_description">Your closest document deadlines at a glance.</string>
+${strings}</resources>
+`);
 
-// 5. Register the receiver in the manifest
+// 6. Register the receivers in the manifest
 const mf = path.join(app, 'AndroidManifest.xml');
 let xml = fs.readFileSync(mf, 'utf8');
 if (!xml.includes('.CountlyWidget')) {
-  const receiver = `
-        <receiver android:name=".CountlyWidget" android:exported="true">
+  let receivers = '';
+  for (const [cls, x] of sizes) {
+    receivers += `
+        <receiver android:name=".${cls}" android:exported="true" android:label="@string/${x}_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
                 <action android:name="android.intent.action.DATE_CHANGED"/>
                 <action android:name="android.intent.action.TIME_SET"/>
                 <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
             </intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/countly_widget_info"/>
-        </receiver>
-    `;
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/${x}"/>
+        </receiver>`;
+  }
   if (!xml.includes('</application>')) { console.error('manifest has no </application>'); process.exit(1); }
-  xml = xml.replace('</application>', receiver + '</application>');
+  xml = xml.replace('</application>', receivers + '\n    </application>');
   fs.writeFileSync(mf, xml);
 }
-console.log('Countly widget added.');
+console.log('Countly widgets added (4 sizes).');

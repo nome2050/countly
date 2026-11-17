@@ -38,8 +38,11 @@
 - **Countdown for every document:** days left, plus an exact "2 years, 3 months, 5 days" breakdown, with a progress ring.
 - **Colour-coded status:** green when valid, amber when it is time to renew, red when it expires within 30 days or has expired.
 - **Dashboard:** a document-health donut chart, key counters, a 12-month expiry timeline, your closest deadlines, and insights such as average time left.
-- **Home-screen widget:** your closest deadlines on the home screen. It resizes, follows your theme, and refreshes by itself every day.
-- **10 colour themes** on a true AMOLED black background, with rounded Material-style design and smooth animations.
+- **Home-screen widgets in 4 sizes:** *Next* (2×2 countdown ring), *Health* (4×2 donut + counters), *List* (4×3 deadlines with progress bars) and *Dashboard* (4×4 donut, 12-month timeline and deadlines). They are drawn like the app, follow your theme and refresh daily.
+- **19 categories with icons** (passport, visa, ID, licence, vehicle, insurance, health, study, work, home, card, plans, warranty, pet, gov, phone, member, utility, other).
+- **Overdue in days, months or years** (or Auto) — your choice in Settings.
+- **Backup / restore** of your documents from the settings sheet.
+- **12 vibrant colour themes** on a true AMOLED black background, with rounded Material-style design and smooth animations.
 - **Private and offline:** everything is stored on your phone. No account, no server, no tracking.
 - **Made for real life:** quick presets (Passport, Iqama, Visa, Driving licence, Insurance, Exit/Re-entry), Arabic names supported, undo after delete, and the Back button closes sheets before leaving the app.
 
@@ -85,6 +88,12 @@ Then open http://localhost:8000. The widget only works in the installed Android 
 ## Project status
 
 Countly is a debug build intended for personal use. The interface and date logic are covered by browser tests (about 90 checks across phone sizes, tablet and landscape). The widget and Android integration were built to the standard Android APIs for versions 13 to 17; please open an issue if something looks wrong on your phone and include your phone model and Android version.
+
+## Updating without losing data
+
+Every build is signed with the same key (`signing/countly.keystore`) and has a higher version number than the last one, and the app ID never changes. Android therefore installs a new APK **over** the old one and keeps all your documents and settings. Documents from older versions load unchanged.
+
+> If Android ever says *App not installed*, the installed copy was signed with a different key (this can happen once, when moving from builds made before fixed signing). Use **Settings > Copy backup** in the app first if you can, then uninstall and install the new APK once; after that every update installs in place.
 
 ## Privacy
 
