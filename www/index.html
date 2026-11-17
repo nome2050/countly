@@ -25,7 +25,7 @@ body{min-height:100vh;padding-bottom:210px;overscroll-behavior:none}
 svg{width:24px;height:24px;fill:currentColor;flex:none}
 
 /* top app bar */
-.bar{position:sticky;top:0;z-index:5;padding:max(14px,env(safe-area-inset-top)) 20px 8px;background:linear-gradient(#000 70%,transparent)}
+.bar{position:sticky;top:0;z-index:5;padding:max(14px,env(safe-area-inset-top)) 20px 8px;background:#000}
 .bar{display:flex;align-items:flex-end;justify-content:space-between}
 .pal{width:48px;height:48px;border-radius:16px;border:0;background:var(--s2);color:var(--primary);display:grid;place-items:center}
 .pal:active{transform:scale(.94)}
@@ -44,7 +44,7 @@ svg{width:24px;height:24px;fill:currentColor;flex:none}
 .hero::after{content:"";position:absolute;right:-60px;top:-60px;width:180px;height:180px;border-radius:50%;background:#ffffff0d}
 .hero .t{flex:1;min-width:0;z-index:1}
 .hero .lbl{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--on-c);opacity:.8}
-.hero .nm{font-size:22px;font-weight:500;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero .nm{font-size:22px;font-weight:500;margin:4px 0 2px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;line-height:1.2}
 .hero .sb{font-size:13px;opacity:.75}
 .ring{position:relative;width:104px;height:104px;flex:none;z-index:1}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -181,6 +181,7 @@ svg{width:24px;height:24px;fill:currentColor;flex:none}
 .nm,.dt,.urow .info{unicode-bidi:plaintext}
 .tile b{font-size:32px;font-weight:600;line-height:1.1}
 .tile span{font-size:13px;color:var(--muted)}
+.tile b .num{font-size:inherit;color:var(--text)}
 .chart{display:flex;align-items:flex-end;gap:5px;height:150px}
 .col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px}
 .col .cnt{font-size:11px;color:var(--muted);height:14px;line-height:14px}

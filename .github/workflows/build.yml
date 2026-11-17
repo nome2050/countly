@@ -1,5 +1,12 @@
 name: Build APK
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish the APK on the Releases page
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,7 +22,17 @@ jobs:
       - run: node scripts/add-branding.js
       - run: npx cap sync android
       - run: cd android && ./gradlew assembleDebug
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Countly.apk
       - uses: actions/upload-artifact@v4
         with:
           name: countly-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: Countly.apk
+      - name: Publish to Releases (direct APK download, no zip)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Countly (latest build)
+          body: "Download **Countly.apk** below, copy it to your Android phone and install it."
+          files: Countly.apk
+          make_latest: true
