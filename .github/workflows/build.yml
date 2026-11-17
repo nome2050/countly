@@ -1,7 +1,7 @@
 name: Build APK
 on:
   push:
-    branches: [main]
+    branches: [main, claude/app-explanation-fmuxk8]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,7 @@ jobs:
       - run: npx cap add android
       - run: node scripts/add-widget.js
       - run: node scripts/add-branding.js
+      - run: node scripts/add-signing.js   # fixed key + rising versionCode => installs as an UPDATE, keeps your data
       - run: npx cap sync android
       - run: cd android && ./gradlew assembleDebug
       - name: Name the APK

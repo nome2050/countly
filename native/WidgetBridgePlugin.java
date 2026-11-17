@@ -20,7 +20,7 @@ public class WidgetBridgePlugin extends Plugin {
         String json = call.getString("json", "{}");
         c.getSharedPreferences(CountlyWidget.PREFS, Context.MODE_PRIVATE)
                 .edit().putString(CountlyWidget.KEY, json).apply();
-        CountlyWidget.refreshAll(c);
+        BaseWidget.refreshAll(c);
         call.resolve();
     }
 
