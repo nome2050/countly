@@ -146,7 +146,7 @@ final class WidgetRenderer {
     }
 
     private static Paint text(int color, float size, boolean bold) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         p.setColor(color);
         p.setTextSize(size);
         p.setTypeface(bold ? Typeface.create("sans-serif-medium", Typeface.BOLD) : Typeface.create("sans-serif", Typeface.NORMAL));
