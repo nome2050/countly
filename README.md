@@ -97,6 +97,19 @@ Every build is signed with the same key (`signing/countly.keystore`) and has a h
 
 > If Android ever says *App not installed*, the installed copy was signed with a different key (this can happen once, when moving from builds made before fixed signing). Use **Settings > Copy backup** in the app first if you can, then uninstall and install the new APK once; after that every update installs in place.
 
+### Keeping the signing key in GitHub Secrets (recommended)
+
+In the repo go to **Settings > Secrets and variables > Actions > New repository secret** and add:
+
+| Secret | Value |
+| --- | --- |
+| `COUNTLY_KEYSTORE_BASE64` | the keystore file as base64 (`base64 -w0 signing/countly.keystore`) |
+| `COUNTLY_KEYSTORE_PASSWORD` | the keystore password |
+| `COUNTLY_KEY_ALIAS` | `countly` |
+| `COUNTLY_KEY_PASSWORD` | the key password |
+
+The build log then says *Signing with the key from GitHub Secrets*. It must be the **same key** as before, otherwise updates stop installing over the old app. Keep a private backup of the keystore: if it is lost, nobody can update the app any more.
+
 ## Privacy
 
 Your documents are stored only on your phone. Countly has no analytics, no account and no server: it never sends your data anywhere.

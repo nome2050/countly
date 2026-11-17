@@ -20,7 +20,13 @@ jobs:
       - run: npx cap add android
       - run: node scripts/add-widget.js
       - run: node scripts/add-branding.js
-      - run: node scripts/add-signing.js   # fixed key + rising versionCode => installs as an UPDATE, keeps your data
+      - name: Signing (fixed key + rising versionCode => installs as an UPDATE, keeps your data)
+        run: node scripts/add-signing.js
+        env:
+          COUNTLY_KEYSTORE_BASE64: ${{ secrets.COUNTLY_KEYSTORE_BASE64 }}
+          COUNTLY_KEYSTORE_PASSWORD: ${{ secrets.COUNTLY_KEYSTORE_PASSWORD }}
+          COUNTLY_KEY_ALIAS: ${{ secrets.COUNTLY_KEY_ALIAS }}
+          COUNTLY_KEY_PASSWORD: ${{ secrets.COUNTLY_KEY_PASSWORD }}
       - run: npx cap sync android
       - run: cd android && ./gradlew assembleDebug
       - name: Name the APK

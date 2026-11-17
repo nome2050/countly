@@ -6,9 +6,27 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const gradle = path.join(root, 'android', 'app', 'build.gradle');
-const keystore = path.join(root, 'signing', 'countly.keystore').replace(/\\/g, '/');
 if (!fs.existsSync(gradle)) { console.error('android/app/build.gradle not found'); process.exit(1); }
-if (!fs.existsSync(keystore)) { console.error('signing/countly.keystore not found'); process.exit(1); }
+
+// Preferred: the key comes from GitHub Secrets (COUNTLY_KEYSTORE_BASE64 etc.).
+// Fallback: the key committed in signing/ (same key, so updates keep working either way).
+let keystore, storePass, alias, keyPass;
+if (process.env.COUNTLY_KEYSTORE_BASE64) {
+  keystore = path.join(root, 'android', 'countly-secret.keystore');
+  fs.writeFileSync(keystore, Buffer.from(process.env.COUNTLY_KEYSTORE_BASE64, 'base64'));
+  storePass = process.env.COUNTLY_KEYSTORE_PASSWORD;
+  alias = process.env.COUNTLY_KEY_ALIAS || 'countly';
+  keyPass = process.env.COUNTLY_KEY_PASSWORD || storePass;
+  if (!storePass) { console.error('COUNTLY_KEYSTORE_PASSWORD secret is missing'); process.exit(1); }
+  console.log('Signing with the key from GitHub Secrets.');
+} else {
+  keystore = path.join(root, 'signing', 'countly.keystore');
+  storePass = keyPass = 'countly-app';
+  alias = 'countly';
+  console.log('Signing with the key committed in signing/ (no secrets configured).');
+}
+if (!fs.existsSync(keystore)) { console.error('keystore not found: ' + keystore); process.exit(1); }
+keystore = keystore.replace(/\\/g, '/');
 
 let g = fs.readFileSync(gradle, 'utf8');
 if (!g.includes('signingConfigs.countly')) {
@@ -16,9 +34,9 @@ if (!g.includes('signingConfigs.countly')) {
     signingConfigs {
         countly {
             storeFile file('${keystore}')
-            storePassword 'countly-app'
-            keyAlias 'countly'
-            keyPassword 'countly-app'
+            storePassword '${storePass}'
+            keyAlias '${alias}'
+            keyPassword '${keyPass}'
         }
     }`);
   g = g.replace(/buildTypes\s*\{/, `buildTypes {
