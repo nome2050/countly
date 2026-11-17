@@ -274,7 +274,7 @@ body>.bar,#vDash,#vDocs,.nav,.sheet{max-width:640px;margin-left:auto;margin-righ
   <div class="set-l">Show overdue time in</div>
   <div class="seg" id="oseg" style="margin-bottom:16px"></div>
   <div class="set-l">Backup your documents</div>
-  <textarea id="bkText" placeholder="Paste a backup here, then tap Restore"></textarea>
+  <textarea id="bkText" placeholder="Paste a backup, or one document per line like:&#10;Iqama, 2027-03-10&#10;Passport, 2030-01-15&#10;then tap Restore"></textarea>
   <div class="bk"><button class="btn t" id="bkCopy">Copy backup</button><button class="btn t" id="bkRestore">Restore</button></div>
   <button class="btn t" style="width:100%;margin-bottom:10px" id="wbtn">Add home-screen widget</button>
   <button class="btn p" style="width:100%" id="tdone">Done</button>
@@ -494,7 +494,9 @@ $('bkCopy').onclick=()=>{
 $('bkRestore').onclick=()=>{
   const t=$('bkText');if(t.style.display!=='block'||!t.value.trim()){t.style.display='block';t.value='';t.focus();snack('Paste your backup, then tap Restore',false);return}
   try{
-    const j=JSON.parse(t.value),arr=Array.isArray(j)?j:j.docs;
+    const raw=t.value.trim();let arr;
+    if(/^[\[{]/.test(raw)){const j=JSON.parse(raw);arr=Array.isArray(j)?j:j.docs}
+    else arr=raw.split(/\r?\n/).map(l=>{const m=l.trim().match(/^(.+?)\s*[,;|\t]\s*(\d{4}-\d{2}-\d{2})(?:\s*[,;|]\s*(\d+))?$/);return m&&{name:m[1].trim(),date:m[2],warn:m[3]||90}}).filter(Boolean);
     const ok=(arr||[]).filter(d=>d&&typeof d.name==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')).map(d=>({id:String(d.id||Date.now()+Math.random()),name:d.name,date:d.date,warn:String(d.warn||90),cat:d.cat||''}));
     if(!ok.length)throw 0;
     const ids=new Set(docs.map(d=>d.id));docs=[...docs,...ok.filter(d=>!ids.has(d.id))];
