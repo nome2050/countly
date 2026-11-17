@@ -37,9 +37,15 @@ w(path.join(res, 'drawable', 'countly_icon_mono.xml'), `<?xml version="1.0" enco
 </vector>
 `);
 
+w(path.join(res, 'values', 'countly_colors.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="countly_icon_bg">#FF000000</color>
+</resources>
+`);
+
 const adaptive = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="#FF000000"/>
+    <background android:drawable="@color/countly_icon_bg"/>
     <foreground android:drawable="@drawable/countly_icon_fg"/>
     <monochrome android:drawable="@drawable/countly_icon_mono"/>
 </adaptive-icon>
