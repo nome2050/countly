@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -20,22 +19,19 @@ import androidx.core.graphics.PathParser;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 /**
- * Draws the Countly home-screen widgets as a bitmap (donut charts, rings, bars, category icons)
- * so they can look like the in-app dashboard. All coordinates are in dp; the canvas is pre-scaled.
+ * Draws the Countly home-screen widgets as one bitmap. Designed for a one-glance read:
+ * big numbers, few elements, status colours. All coordinates are in dp (canvas is pre-scaled).
  */
 final class WidgetRenderer {
     static final int OK = 0xFF30E88D, WARN = 0xFFFFB524, BAD = 0xFFFF4D5E, EXP = 0xFFFF2E93;
-    static final int MUTED = 0xFF9B99A6, WHITE = 0xFFF2F1F7, TRACK = 0x24FFFFFF;
+    static final int MUTED = 0xFF9B99A6, WHITE = 0xFFF2F1F7, TRACK = 0x26FFFFFF;
 
     private WidgetRenderer() {}
 
@@ -47,7 +43,7 @@ final class WidgetRenderer {
         Path icon;
         int cc = 0xFFB8B8CC;
 
-        int state() { // 0 ok, 1 renew soon, 2 expiring, 3 expired
+        int state() { // 0 valid, 1 renew soon, 2 expiring (<=30d), 3 expired
             return days < 0 ? 3 : days <= 30 ? 2 : days <= warn ? 1 : 0;
         }
 
@@ -67,10 +63,16 @@ final class WidgetRenderer {
     // ------------------------------------------------------------------ data
 
     static Data load(Context c) {
+        String raw = "{}";
+        try {
+            raw = c.getSharedPreferences(CountlyWidget.PREFS, Context.MODE_PRIVATE).getString(CountlyWidget.KEY, "{}");
+        } catch (Exception ignored) { }
+        return parse(raw);
+    }
+
+    static Data parse(String raw) {
         Data data = new Data();
         try {
-            String raw = c.getSharedPreferences(CountlyWidget.PREFS, Context.MODE_PRIVATE)
-                    .getString(CountlyWidget.KEY, "{}");
             JSONObject root = new JSONObject(raw);
             if (root.has("primary")) data.primary = Color.parseColor(root.getString("primary"));
             data.over = root.optString("overUnit", "days");
@@ -115,10 +117,10 @@ final class WidgetRenderer {
         return (int) Math.round((t.getTimeInMillis() - n.getTimeInMillis()) / 86400000.0);
     }
 
-    /** {number, long label, short label} for an item: "days left" or overdue in days/months/years. */
+    /** {number, long label, short label}: "49 / days left" or overdue in days/months/years. */
     static String[] amount(Data data, Item it) {
         if (it.days >= 0) {
-            if (it.days == 0) return new String[]{"0", "today", "today"};
+            if (it.days == 0) return new String[]{"0", "due today", "today"};
             return new String[]{String.valueOf(it.days), it.days == 1 ? "day left" : "days left", it.days == 1 ? "day" : "days"};
         }
         Calendar n = Calendar.getInstance();
@@ -134,6 +136,36 @@ final class WidgetRenderer {
         if ("years".equals(u)) return new String[]{String.valueOf(yr), yr == 1 ? "year over" : "years over", "yr over"};
         if ("months".equals(u)) return new String[]{String.valueOf(mo), mo == 1 ? "month over" : "months over", "mo over"};
         return new String[]{String.valueOf(days), days == 1 ? "day over" : "days over", "d over"};
+    }
+
+    /** Short human text for a row: "Today", "Tomorrow", "23 days", "5 months", "1y 8m", "3 months over". */
+    static String chip(Data data, Item it) {
+        if (it.days < 0) {
+            String[] a = amount(data, it);
+            return a[0] + a[2].replace("d over", "d over").replace("mo over", " mo over").replace("yr over", " yr over");
+        }
+        if (it.days == 0) return "Today";
+        if (it.days == 1) return "Tomorrow";
+        if (it.days <= 60) return it.days + " days";
+        if (it.days < 730) return Math.round(it.days / 30.4f) + " months";
+        int y = it.days / 365;
+        int m = Math.round((it.days - y * 365) / 30.4f);
+        if (m >= 12) { y++; m = 0; }
+        return m == 0 ? y + " years" : y + "y " + m + "m";
+    }
+
+    /** Worst status present, as a headline. */
+    static String statusText(Data d) {
+        if (d.items.isEmpty()) return "Add a document";
+        if (d.cnt[3] > 0) return d.cnt[3] + " expired";
+        if (d.cnt[2] > 0) return d.cnt[2] + " expiring soon";
+        if (d.cnt[1] > 0) return d.cnt[1] + " to renew";
+        return "All valid";
+    }
+
+    static int statusColor(Data d) {
+        if (d.items.isEmpty()) return MUTED;
+        return d.cnt[3] > 0 ? EXP : d.cnt[2] > 0 ? BAD : d.cnt[1] > 0 ? WARN : OK;
     }
 
     // --------------------------------------------------------------- helpers
@@ -153,9 +185,13 @@ final class WidgetRenderer {
         return p;
     }
 
-    private static void txt(Canvas c, String s, float x, float y, Paint p, float maxW, Paint.Align a) {
+    /** Text that shrinks until it fits maxW (never below min), then is cut with an ellipsis. */
+    private static void fitText(Canvas c, String s, float x, float y, int color, float size, float min,
+                                boolean bold, float maxW, Paint.Align a) {
         if (s == null) return;
-        if (maxW > 0) s = TextUtils.ellipsize(s, new TextPaint(p), maxW, TextUtils.TruncateAt.END).toString();
+        Paint p = text(color, size, bold);
+        while (p.measureText(s) > maxW && p.getTextSize() > min) p.setTextSize(p.getTextSize() - 0.5f);
+        if (p.measureText(s) > maxW) s = TextUtils.ellipsize(s, new TextPaint(p), maxW, TextUtils.TruncateAt.END).toString();
         p.setTextAlign(a);
         c.drawText(s, x, y, p);
     }
@@ -184,15 +220,24 @@ final class WidgetRenderer {
     }
 
     private static void iconTile(Canvas c, Item it, float x, float y, float size) {
-        c.drawRoundRect(new RectF(x, y, x + size, y + size), size * 0.3f, size * 0.3f, fill(alpha(it.cc, 52)));
+        c.drawRoundRect(new RectF(x, y, x + size, y + size), size * 0.32f, size * 0.32f, fill(alpha(it.cc, 56)));
         float in = size * 0.58f;
         icon(c, it.icon, x + (size - in) / 2, y + (size - in) / 2, in, it.cc);
     }
 
+    /** Rounded coloured chip, right edge at rightX, vertically centred on cy. Returns its width. */
+    private static float pill(Canvas c, String s, float rightX, float cy, int col, float size) {
+        Paint t = text(col, size, true);
+        float pw = t.measureText(s) + 16, ph = size + 10;
+        c.drawRoundRect(new RectF(rightX - pw, cy - ph / 2, rightX, cy + ph / 2), ph / 2, ph / 2, fill(alpha(col, 48)));
+        t.setTextAlign(Paint.Align.CENTER);
+        c.drawText(s, rightX - pw / 2, cy + size * 0.36f, t);
+        return pw;
+    }
+
     // ------------------------------------------------------------- rendering
 
-    static Bitmap render(Context ctx, String kind, int wDp, int hDp, float density) {
-        Data data = load(ctx);
+    static Bitmap render(Data data, String kind, int wDp, int hDp, float density) {
         float scale = density;
         long px = (long) (wDp * scale) * (long) (hDp * scale);
         if (px > 1400000L) scale = (float) (scale * Math.sqrt(1400000.0 / px));
@@ -203,195 +248,139 @@ final class WidgetRenderer {
         float w = wDp, h = hDp;
 
         background(c, w, h, data.primary);
-
         if ("next".equals(kind)) next(c, data, w, h);
-        else if ("health".equals(kind)) health(c, data, 14, 12, w - 28, h - 24);
+        else if ("health".equals(kind)) glance(c, data, w, h);
         else if ("full".equals(kind)) full(c, data, w, h);
         else list(c, data, w, h);
         return bmp;
     }
 
     private static void background(Canvas c, float w, float h, int primary) {
-        float rad = 26;
+        float rad = 28;
         RectF r = new RectF(0, 0, w, h);
         c.drawRoundRect(r, rad, rad, fill(0xFF000000));
         Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glow.setShader(new RadialGradient(w * 0.92f, 0, Math.max(w, h) * 0.95f,
-                alpha(primary, 78), alpha(primary, 0), Shader.TileMode.CLAMP));
+        glow.setShader(new RadialGradient(w * 0.1f, 0, Math.max(w, h) * 0.85f,
+                alpha(primary, 52), alpha(primary, 0), Shader.TileMode.CLAMP));
         c.drawRoundRect(r, rad, rad, glow);
-        Paint glow2 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glow2.setShader(new LinearGradient(0, h, 0, h * 0.55f, alpha(primary, 26), alpha(primary, 0), Shader.TileMode.CLAMP));
-        c.drawRoundRect(r, rad, rad, glow2);
         Paint st = new Paint(Paint.ANTI_ALIAS_FLAG);
         st.setStyle(Paint.Style.STROKE);
         st.setStrokeWidth(1);
-        st.setColor(0x1FFFFFFF);
+        st.setColor(0x26FFFFFF);
         c.drawRoundRect(new RectF(0.5f, 0.5f, w - 0.5f, h - 0.5f), rad, rad, st);
     }
 
     private static void emptyState(Canvas c, Data data, float w, float h) {
-        float cx = w / 2, cy = h / 2 - 6;
-        c.drawCircle(cx, cy, 18, fill(alpha(data.primary, 50)));
+        float cx = w / 2, cy = h / 2 - 8;
+        c.drawCircle(cx, cy, 20, fill(alpha(data.primary, 56)));
         Paint pl = fill(data.primary);
-        c.drawRoundRect(new RectF(cx - 8, cy - 1.5f, cx + 8, cy + 1.5f), 1.5f, 1.5f, pl);
-        c.drawRoundRect(new RectF(cx - 1.5f, cy - 8, cx + 1.5f, cy + 8), 1.5f, 1.5f, pl);
-        txt(c, "Tap to add a document", cx, cy + 36, text(MUTED, 12, false), w - 24, Paint.Align.CENTER);
+        c.drawRoundRect(new RectF(cx - 9, cy - 1.75f, cx + 9, cy + 1.75f), 1.75f, 1.75f, pl);
+        c.drawRoundRect(new RectF(cx - 1.75f, cy - 9, cx + 1.75f, cy + 9), 1.75f, 1.75f, pl);
+        fitText(c, "Tap to add a document", cx, cy + 40, MUTED, 12.5f, 9, false, w - 24, Paint.Align.CENTER);
     }
 
-    /** 2x2: closest deadline as a big progress ring. */
+    /** 2x2: the single most urgent document as a big ring. */
     private static void next(Canvas c, Data data, float w, float h) {
         if (data.items.isEmpty()) { emptyState(c, data, w, h); return; }
         Item it = data.items.get(0);
         float pad = 12;
-        txt(c, it.name, pad, pad + 11, text(WHITE, 12.5f, true), w - 2 * pad - 2, Paint.Align.LEFT);
-        float top = pad + 20, bottom = h - 10;
-        float r = Math.min((w - 2 * pad) / 2, (bottom - top) / 2) - 5;
+        fitText(c, it.name, w / 2, pad + 12, WHITE, 13, 9, true, w - 2 * pad, Paint.Align.CENTER);
+        float top = pad + 22, bottom = h - 12;
+        float r = Math.min((w - 2 * pad) / 2, (bottom - top) / 2) - 3;
         float cx = w / 2, cy = (top + bottom) / 2;
-        float stroke = Math.max(5, r * 0.17f);
-        c.drawCircle(cx, cy, r, ringBg(it.color()));
+        float stroke = Math.max(6, r * 0.18f);
+        int col = it.color();
         arc(c, cx, cy, r, stroke, 0, 360, TRACK);
-        float frac = Math.max(0.04f, Math.min(1f, it.days / 365f));
-        arc(c, cx, cy, r, stroke, -90, 360 * (it.days < 0 ? 1f : frac), it.color());
+        float frac = it.days < 0 ? 1f : Math.max(0.05f, Math.min(1f, it.days / 365f));
+        arc(c, cx, cy, r, stroke, -90, 360 * frac, col);
         String[] a = amount(data, it);
-        txt(c, a[0], cx, cy + r * 0.2f, text(WHITE, r * 0.78f, true), r * 1.5f, Paint.Align.CENTER);
-        txt(c, a[1], cx, cy + r * 0.2f + r * 0.38f, text(it.color(), Math.max(8, r * 0.27f), true), r * 1.6f, Paint.Align.CENTER);
+        float inner = (r - stroke) * 1.7f;
+        fitText(c, a[0], cx, cy + r * 0.16f, WHITE, r * 0.8f, 12, true, inner, Paint.Align.CENTER);
+        fitText(c, a[1], cx, cy + r * 0.16f + r * 0.36f, col, Math.max(9, r * 0.26f), 7, true, inner, Paint.Align.CENTER);
     }
 
-    private static Paint ringBg(int color) {
-        return fill(alpha(color, 22));
+    /** 4x2: the most urgent document on the left (big), the next three on the right. */
+    private static void glance(Canvas c, Data data, float w, float h) {
+        if (data.items.isEmpty()) { emptyState(c, data, w, h); return; }
+        Item it = data.items.get(0);
+        float pad = 16;
+        float split = Math.max(108, w * 0.38f);
+        int col = it.color();
+        String[] a = amount(data, it);
+        float lw = split - pad - 6;
+        fitText(c, "NEXT", pad, pad + 9, MUTED, 10, 8, true, lw, Paint.Align.LEFT);
+        fitText(c, a[0], pad, h / 2 + 9, col, Math.min(40, h * 0.36f), 16, true, lw, Paint.Align.LEFT);
+        fitText(c, a[1], pad, h / 2 + 26, col, 12, 8, true, lw, Paint.Align.LEFT);
+        fitText(c, it.name, pad, h - pad + 1, WHITE, 12.5f, 11f, true, lw, Paint.Align.LEFT);
+
+        c.drawRoundRect(new RectF(split, pad, split + 1, h - pad), 0.5f, 0.5f, fill(0x1FFFFFFF));
+        float rx = split + 14, rw = w - rx - pad + 2;
+        int n = (int) Math.min(3, data.items.size() - 1);
+        if (n < 1) {
+            fitText(c, statusText(data), rx, h / 2 + 5, statusColor(data), 14, 10, true, rw, Paint.Align.LEFT);
+            return;
+        }
+        float rh = Math.min(36, (h - 2 * pad + 4) / n);
+        float top = (h - rh * n) / 2f;
+        for (int i = 0; i < n; i++) {
+            Item o = data.items.get(i + 1);
+            float cy = top + rh * i + rh / 2;
+            String s = chip(data, o);
+            Paint vp = text(o.color(), 12, true);
+            float vw = vp.measureText(s);
+            vp.setTextAlign(Paint.Align.RIGHT);
+            c.drawText(s, rx + rw, cy + 4.3f, vp);
+            fitText(c, o.name, rx, cy + 4.5f, WHITE, 13, 12, true, rw - vw - 8, Paint.Align.LEFT);
+        }
     }
 
-    /** Header with app name and a coloured status line. */
+    /** Header: app name + worst-status chip. */
     private static void header(Canvas c, Data data, float x, float y, float w) {
-        c.drawRoundRect(new RectF(x, y + 2, x + 8, y + 16), 3, 3, fill(data.primary));
-        txt(c, "Countly", x + 14, y + 14, text(data.primary, 15, true), w * 0.5f, Paint.Align.LEFT);
-        int need = data.cnt[2] + data.cnt[3];
-        String s;
-        int col;
-        if (data.items.isEmpty()) { s = "Tap to add documents"; col = MUTED; }
-        else if (need > 0) { s = need + (need == 1 ? " needs action" : " need action"); col = BAD; }
-        else { s = "All good ✓"; col = OK; }
-        txt(c, s, x + w, y + 14, text(col, 12, true), w * 0.55f, Paint.Align.RIGHT);
+        float cy = y + 11;
+        c.drawRoundRect(new RectF(x, cy - 7, x + 5, cy + 7), 2.5f, 2.5f, fill(data.primary));
+        fitText(c, "Countly", x + 12, cy + 5.5f, data.primary, 16, 12, true, w * 0.4f, Paint.Align.LEFT);
+        pill(c, statusText(data), x + w, cy, statusColor(data), 11.5f);
     }
 
-    /** Donut with the health score + 2x2 status counters. */
-    private static void health(Canvas c, Data data, float x, float y, float w, float h) {
-        if (data.items.isEmpty()) { emptyState(c, data, x * 2 + w, y * 2 + h); return; }
-        int total = data.items.size();
-        float r = Math.min(h / 2f - 3, w * 0.30f);
-        float cx = x + r + 3, cy = y + h / 2f;
-        float stroke = r * 0.27f, rr = r - stroke / 2;
-        arc(c, cx, cy, rr, stroke, 0, 360, TRACK);
-        int[] cols = {OK, WARN, BAD, EXP};
-        float start = -90;
-        for (int i = 0; i < 4; i++) {
-            if (data.cnt[i] == 0) continue;
-            float sw = 360f * data.cnt[i] / total;
-            float gap = total > 1 ? 7 : 0;
-            arc(c, cx, cy, rr, stroke, start + gap / 2, Math.max(2, sw - gap), cols[i]);
-            start += sw;
-        }
-        int score = Math.round(100f * data.cnt[0] / total);
-        txt(c, score + "%", cx, cy + r * 0.14f, text(WHITE, r * 0.5f, true), r * 1.3f, Paint.Align.CENTER);
-        txt(c, "healthy", cx, cy + r * 0.14f + r * 0.3f, text(MUTED, Math.max(8, r * 0.2f), false), r * 1.3f, Paint.Align.CENTER);
-
-        float gx = x + 2 * r + 20, gw = x + w - gx;
-        if (gw < 60) return;
-        String[] lbl = {"Valid", "Renew", "≤ 30 days", "Expired"};
-        float cell = gw / 2f, ch = Math.min(40, h / 2f);
-        float gy = y + (h - 2 * ch) / 2f;
-        for (int i = 0; i < 4; i++) {
-            float px = gx + (i % 2) * cell, py = gy + (i / 2) * ch;
-            c.drawRoundRect(new RectF(px, py + 4, px + 4, py + 4 + 24), 2, 2, fill(cols[i]));
-            txt(c, String.valueOf(data.cnt[i]), px + 10, py + 20, text(WHITE, 19, true), cell - 12, Paint.Align.LEFT);
-            txt(c, lbl[i], px + 10, py + 32, text(MUTED, 10, false), cell - 12, Paint.Align.LEFT);
-        }
-    }
-
-    /** 12-month expiry timeline (first bar = already expired). */
-    private static void timeline(Canvas c, Data data, float x, float y, float w, float h) {
-        txt(c, "Expiry timeline", x, y + 10, text(MUTED, 10.5f, false), w, Paint.Align.LEFT);
-        int[] counts = new int[13];
-        Calendar now = Calendar.getInstance();
-        for (Item it : data.items) {
-            if (it.days < 0) { counts[0]++; continue; }
-            int idx = (it.y - now.get(Calendar.YEAR)) * 12 + it.m - 1 - now.get(Calendar.MONTH);
-            if (idx >= 0 && idx < 12) counts[idx + 1]++;
-        }
-        int max = 1;
-        for (int v : counts) max = Math.max(max, v);
-        float top = y + 16, labelH = 11, base = y + h - labelH;
-        float gap = 4, bw = (w - gap * 12) / 13f;
-        SimpleDateFormat f = new SimpleDateFormat("MMM", Locale.getDefault());
-        for (int i = 0; i < 13; i++) {
-            float bx = x + i * (bw + gap);
-            float bh = counts[i] == 0 ? 3 : Math.max(8, (base - top - 10) * counts[i] / max);
-            int col = counts[i] == 0 ? 0x1FFFFFFF : i == 0 ? EXP : data.primary;
-            c.drawRoundRect(new RectF(bx, base - bh, bx + bw, base), 3, 3, fill(col));
-            if (counts[i] > 0)
-                txt(c, String.valueOf(counts[i]), bx + bw / 2, base - bh - 2, text(MUTED, 8, false), 0, Paint.Align.CENTER);
-            String l = "!";
-            if (i > 0) {
-                Calendar m = Calendar.getInstance();
-                m.set(Calendar.DAY_OF_MONTH, 1);
-                m.add(Calendar.MONTH, i - 1);
-                String s = f.format(new Date(m.getTimeInMillis()));
-                l = s.length() > 0 ? s.substring(0, 1).toUpperCase() : "";
-            }
-            txt(c, l, bx + bw / 2, y + h - 1, text(i == 1 ? WHITE : MUTED, 8.5f, i == 1), 0, Paint.Align.CENTER);
-        }
-    }
-
-    /** Rows of closest deadlines: category icon, name, status progress bar, amount. */
+    /** Rows of closest deadlines: category icon, name, status chip. */
     private static void rows(Canvas c, Data data, float x, float y, float w, float h, int maxRows) {
-        int n = (int) Math.min(Math.min(maxRows, data.items.size()), Math.floor(h / 30f));
+        int n = (int) Math.min(Math.min(maxRows, data.items.size()), Math.floor(h / 34f));
         if (n < 1) return;
-        float rh = Math.min(42, h / n);
+        float rh = Math.min(44, h / n);
         for (int i = 0; i < n; i++) {
             Item it = data.items.get(i);
-            float top = y + i * rh;
-            float tile = Math.min(28, rh - 6);
-            float ty = top + (rh - tile) / 2;
-            iconTile(c, it, x, ty, tile);
-            float nx = x + tile + 10, rw = 62;
-            float textW = w - tile - 10 - rw - 6;
-            String[] a = amount(data, it);
-            if (rh >= 32) {
-                txt(c, it.name, nx, top + rh / 2 - 2, text(WHITE, 13, true), textW, Paint.Align.LEFT);
-                float by = top + rh / 2 + 5;
-                c.drawRoundRect(new RectF(nx, by, nx + textW, by + 3.5f), 2, 2, fill(TRACK));
-                float frac = it.days < 0 ? 1f : Math.max(0.05f, Math.min(1f, it.days / 365f));
-                c.drawRoundRect(new RectF(nx, by, nx + textW * frac, by + 3.5f), 2, 2, fill(it.color()));
-                txt(c, a[0], x + w, top + rh / 2 + 1, text(it.color(), 16, true), rw, Paint.Align.RIGHT);
-                txt(c, a[2], x + w, top + rh / 2 + 12, text(MUTED, 9, false), rw, Paint.Align.RIGHT);
-            } else {
-                txt(c, it.name, nx, top + rh / 2 + 4.5f, text(WHITE, 13, true), textW, Paint.Align.LEFT);
-                txt(c, a[0] + " " + a[2], x + w, top + rh / 2 + 4.5f, text(it.color(), 13, true), rw, Paint.Align.RIGHT);
-            }
+            float top = y + i * rh, cy = top + rh / 2;
+            float tile = Math.min(28, rh - 8);
+            iconTile(c, it, x, cy - tile / 2, tile);
+            String s = chip(data, it);
+            float pw = pill(c, s, x + w, cy, it.color(), 11.5f);
+            fitText(c, it.name, x + tile + 10, cy + 4.8f, WHITE, 13.5f, 13f, true, w - tile - 10 - pw - 10, Paint.Align.LEFT);
         }
     }
 
-    /** 4x3: header + closest deadlines. */
+    /** 4x3: header + the closest deadlines. */
     private static void list(Canvas c, Data data, float w, float h) {
-        float pad = 14;
+        float pad = 16;
         header(c, data, pad, 12, w - 2 * pad);
-        if (data.items.isEmpty()) { emptyState(c, data, w, h + 30); return; }
-        rows(c, data, pad, 38, w - 2 * pad, h - 38 - 10, 8);
+        if (data.items.isEmpty()) { emptyState(c, data, w, h + 36); return; }
+        rows(c, data, pad, 44, w - 2 * pad, h - 44 - 10, 6);
     }
 
-    /** 4x4: full dashboard. */
+    /** 4x4: header, four status counters, then the closest deadlines. */
     private static void full(Canvas c, Data data, float w, float h) {
-        float pad = 14;
+        float pad = 16;
         header(c, data, pad, 12, w - 2 * pad);
-        if (data.items.isEmpty()) { emptyState(c, data, w, h + 30); return; }
-        float y = 40;
-        float hb = h >= 230 ? 88 : 74;
-        health(c, data, pad, y, w - 2 * pad, hb);
-        y += hb + 8;
-        if (h - y >= 160) {
-            timeline(c, data, pad, y, w - 2 * pad, 58);
-            y += 66;
+        if (data.items.isEmpty()) { emptyState(c, data, w, h + 36); return; }
+        float y = 44, gap = 8, tw = (w - 2 * pad - 3 * gap) / 4f, th = h >= 240 ? 52 : 46;
+        String[] lbl = {"Valid", "Renew", "Soon", "Expired"};
+        int[] cols = {OK, WARN, BAD, EXP};
+        for (int i = 0; i < 4; i++) {
+            float x = pad + i * (tw + gap);
+            c.drawRoundRect(new RectF(x, y, x + tw, y + th), 14, 14, fill(alpha(cols[i], data.cnt[i] > 0 ? 46 : 20)));
+            fitText(c, String.valueOf(data.cnt[i]), x + tw / 2, y + th * 0.52f, data.cnt[i] > 0 ? cols[i] : MUTED, 22, 12, true, tw - 6, Paint.Align.CENTER);
+            fitText(c, lbl[i], x + tw / 2, y + th - 9, data.cnt[i] > 0 ? WHITE : MUTED, 10.5f, 7.5f, false, tw - 4, Paint.Align.CENTER);
         }
-        rows(c, data, pad, y, w - 2 * pad, h - y - 10, 6);
+        y += th + 10;
+        rows(c, data, pad, y, w - 2 * pad, h - y - 10, 8);
     }
 }

@@ -64,7 +64,7 @@ public abstract class BaseWidget extends AppWidgetProvider {
             if (w < 60) w = dw;
             if (h < 60) h = dh;
             float density = c.getResources().getDisplayMetrics().density;
-            Bitmap bmp = WidgetRenderer.render(c, kind, w, h, density);
+            Bitmap bmp = WidgetRenderer.render(WidgetRenderer.load(c), kind, w, h, density);
             rv.setImageViewBitmap(R.id.img, bmp);
         } catch (Throwable ignored) {
         }

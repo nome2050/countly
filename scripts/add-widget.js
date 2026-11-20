@@ -17,7 +17,8 @@ const w = (p, s) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.wri
 // 1. Java sources (MainActivity is replaced so it registers the bridge plugin)
 fs.mkdirSync(javaDir, { recursive: true });
 for (const f of ['BaseWidget.java', 'WidgetRenderer.java', 'CountlyWidget.java', 'WidgetNext.java',
-                 'WidgetHealth.java', 'WidgetFull.java', 'WidgetBridgePlugin.java', 'MainActivity.java']) {
+                 'WidgetHealth.java', 'WidgetFull.java', 'Notifier.java', 'NotifyReceiver.java', 'BootReceiver.java',
+                 'WidgetBridgePlugin.java', 'MainActivity.java']) {
   fs.copyFileSync(path.join(root, 'native', f), path.join(javaDir, f));
 }
 
@@ -58,6 +59,14 @@ w(path.join(resDir, 'drawable', 'widget_bg.xml'), `<?xml version="1.0" encoding=
 </shape>
 `);
 
+// 4b. Status-bar icon for reminder notifications (a bell)
+w(path.join(resDir, 'drawable', 'ic_stat_countly.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.9,2 2,2zM18,16v-5c0,-3.07 -1.63,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.64,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z"/>
+</vector>
+`);
+
 // 5. Widget metadata: four sizes
 const sizes = [
   // [class, xml name, label, description, minW, minH, resizeW, resizeH, cellsW, cellsH, preview]
@@ -88,9 +97,18 @@ w(path.join(resDir, 'values', 'countly_widget_strings.xml'), `<?xml version="1.0
 ${strings}</resources>
 `);
 
-// 6. Register the receivers in the manifest
+// 6. Register the receivers + permissions in the manifest
 const mf = path.join(app, 'AndroidManifest.xml');
 let xml = fs.readFileSync(mf, 'utf8');
+if (!xml.includes('POST_NOTIFICATIONS')) {
+  const perms = `    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.READ_CALENDAR"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    `;
+  if (!xml.includes('<application')) { console.error('manifest has no <application'); process.exit(1); }
+  xml = xml.replace('<application', perms + '<application');
+}
 if (!xml.includes('.CountlyWidget')) {
   let receivers = '';
   for (const [cls, x] of sizes) {
@@ -106,6 +124,14 @@ if (!xml.includes('.CountlyWidget')) {
         </receiver>`;
   }
   if (!xml.includes('</application>')) { console.error('manifest has no </application>'); process.exit(1); }
+  receivers += `
+        <receiver android:name=".NotifyReceiver" android:exported="false"/>
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>`;
   xml = xml.replace('</application>', receivers + '\n    </application>');
   fs.writeFileSync(mf, xml);
 }
