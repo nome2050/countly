@@ -47,7 +47,7 @@ const sample = (title, rows) => `<?xml version="1.0" encoding="utf-8"?>
 const R3 = [['Iqama', '23 days', '#FF4D5E'], ['Passport', '4 months', '#FFB524'], ['Insurance', '1 year', '#30E88D']];
 w(path.join(resDir, 'layout', 'widget_preview_list.xml'), sample('Countly', R3));
 w(path.join(resDir, 'layout', 'widget_preview_next.xml'), sample('Iqama', [['23', 'days left', '#FF4D5E']]));
-w(path.join(resDir, 'layout', 'widget_preview_health.xml'), sample('Health 67%', [['Valid 4', 'Renew 1', '#FFB524'], ['≤30d 1', 'Expired 0', '#FF4D5E']]));
+w(path.join(resDir, 'layout', 'widget_preview_health.xml'), sample('Next · Iqama', [['Insurance', '7 days', '#FF4D5E'], ['Passport', '4 months', '#FFB524'], ['Visa', '2 years', '#30E88D']]));
 w(path.join(resDir, 'layout', 'widget_preview_full.xml'), sample('Countly', [...R3, ['Visa', '2 years', '#30E88D']]));
 
 // 4. Background used by previews: pure AMOLED black, rounded
@@ -72,7 +72,7 @@ const sizes = [
   // [class, xml name, label, description, minW, minH, resizeW, resizeH, cellsW, cellsH, preview]
   ['CountlyWidget', 'countly_widget_info', 'Countly List', 'Your closest deadlines with progress bars.', 250, 180, 180, 110, 4, 3, 'list'],
   ['WidgetNext', 'countly_widget_next_info', 'Countly Next', 'A big countdown ring for your next expiry.', 110, 110, 110, 110, 2, 2, 'next'],
-  ['WidgetHealth', 'countly_widget_health_info', 'Countly Health', 'Health score donut and status counters.', 250, 110, 180, 110, 4, 2, 'health'],
+  ['WidgetHealth', 'countly_widget_health_info', 'Countly Glance', 'Your most urgent document in big numbers, plus the next three.', 250, 110, 180, 110, 4, 2, 'health'],
   ['WidgetFull', 'countly_widget_full_info', 'Countly Dashboard', 'Donut, 12-month timeline and upcoming deadlines.', 250, 250, 250, 180, 4, 4, 'full'],
 ];
 let strings = '';
