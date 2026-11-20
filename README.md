@@ -39,9 +39,9 @@
 - **Colour-coded status:** green when valid, amber when it is time to renew, red when it expires within 30 days or has expired.
 - **Dashboard:** a document-health donut chart, key counters, a 12-month expiry timeline, your closest deadlines, and insights such as average time left.
 - **Home-screen widgets in 4 sizes, built to read at a glance:** *Next* (2×2 ring with the days left), *Glance* (4×2: your most urgent document big, the next three beside it), *List* (4×3 deadlines with colour chips) and *Dashboard* (4×4 status counters plus deadlines). They follow your theme and refresh daily.
-- **Reminders and alerts:** a daily notification that lists everything pending and how long is left. Choose reminders 1 month, 2 weeks, 1 week, 2 days, 1 day before and on the day, plus weekly or daily nagging for overdue items and an optional daily summary. Items due within 2 days, today or overdue arrive as urgent alerts. The Dashboard also shows what needs attention.
-- **Calendar import:** pull renewals in from Google Calendar or Outlook, either by reading the calendars on your phone (any account that syncs to it) or from an ICS link or file.
-- **AI assistant (optional, bring your own Groq key):** *Smart add* turns pasted text into documents, *Ask Countly* answers questions about your documents, plus renewal tips and AI selection of renewal-like calendar events.
+- **Two tabs, everything inside them:** *Dashboard* (what needs attention, document health, 12-month timeline, up next, insights and your **Reminders**) and *Documents* (the full list, filters and **Import from Google / Outlook calendar**). The palette button holds theme, overdue unit, backup and the widget shortcut.
+- **Reminders and alerts (on the Dashboard):** a daily notification that lists everything pending and how long is left. Choose reminders 1 month, 2 weeks, 1 week, 2 days, 1 day before and on the day, plus weekly or daily nagging for overdue items and an optional daily summary. Items due within 2 days, today or overdue arrive as urgent alerts.
+- **Calendar import (on the Documents tab):** pull renewals in from Google Calendar or Outlook, either by reading the calendars on your phone (any account that syncs to it) or from an ICS link or file.
 - **19 categories with icons** (passport, visa, ID, licence, vehicle, insurance, health, study, work, home, card, plans, warranty, pet, gov, phone, member, utility, other).
 - **Overdue in days, months or years** (or Auto) in Settings.
 - **Backup / restore** of your documents, including pasting one document per line.
@@ -114,11 +114,14 @@ The build log then says *Signing with the key from GitHub Secrets*. It must be t
 
 ## Privacy
 
-Your documents are stored only on your phone. Countly has no analytics, no account and no server of its own.
+Your documents are stored only on your phone. Countly has no analytics, no account, no server of its own and no AI service.
 
-Three optional things use the network, and only when you use them:
-- **AI features:** when you paste a Groq API key in Settings and use Smart add, the assistant, renewal tips or the calendar AI picker, the relevant document names and dates (or the calendar event titles) are sent to Groq to get an answer. Your key is stored only on your phone. Remove the key to turn AI off.
-- **ICS link import:** fetches the calendar link you paste.
-- **Phone calendar import:** reads your phone's calendars on the device and sends nothing anywhere. It needs the calendar permission.
+Two optional things touch other places, only when you use them:
+- **Phone calendar import** reads your phone's calendars on the device and sends nothing anywhere. It needs the calendar permission.
+- **ICS link import** fetches the calendar link you paste.
 
-Notifications use the notification permission and run entirely on the phone.
+Reminders use the notification permission and run entirely on the phone.
+
+## How changes are released
+
+Changes are pushed to a development branch first. The build must pass (it compiles the app and publishes the APK), and only then is the branch merged into `main` and this README brought up to date, so `main` always matches an APK that built successfully.
