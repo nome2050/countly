@@ -45,6 +45,6 @@ if (!g.includes('signingConfigs.countly')) {
         }`);
 }
 const code = Math.floor(Date.now() / 60000); // minutes since 1970: always rises, fits in an int until ~6000 AD
-g = g.replace(/versionCode\s+\d+/, 'versionCode ' + code).replace(/versionName\s+"[^"]*"/, 'versionName "1.1.0"');
+g = g.replace(/versionCode\s+\d+/, 'versionCode ' + code).replace(/versionName\s+"[^"]*"/, 'versionName "1.2.0"');
 fs.writeFileSync(gradle, g);
 console.log('Signing + versionCode ' + code + ' configured.');

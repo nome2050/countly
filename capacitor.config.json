@@ -1,1 +1,1 @@
-{"appId":"com.countly.app","appName":"Countly","webDir":"www","backgroundColor":"#000000"}
+{"appId":"com.countly.app","appName":"Countly","webDir":"www","backgroundColor":"#000000","plugins":{"CapacitorHttp":{"enabled":true}}}

@@ -38,12 +38,14 @@
 - **Countdown for every document:** days left, plus an exact "2 years, 3 months, 5 days" breakdown, with a progress ring.
 - **Colour-coded status:** green when valid, amber when it is time to renew, red when it expires within 30 days or has expired.
 - **Dashboard:** a document-health donut chart, key counters, a 12-month expiry timeline, your closest deadlines, and insights such as average time left.
-- **Home-screen widgets in 4 sizes:** *Next* (2×2 countdown ring), *Health* (4×2 donut + counters), *List* (4×3 deadlines with progress bars) and *Dashboard* (4×4 donut, 12-month timeline and deadlines). They are drawn like the app, follow your theme and refresh daily.
+- **Home-screen widgets in 4 sizes, built to read at a glance:** *Next* (2×2 ring with the days left), *Glance* (4×2: your most urgent document big, the next three beside it), *List* (4×3 deadlines with colour chips) and *Dashboard* (4×4 status counters plus deadlines). They follow your theme and refresh daily.
+- **Reminders and alerts:** a daily notification that lists everything pending and how long is left. Choose reminders 1 month, 2 weeks, 1 week, 2 days, 1 day before and on the day, plus weekly or daily nagging for overdue items and an optional daily summary. Items due within 2 days, today or overdue arrive as urgent alerts. The Dashboard also shows what needs attention.
+- **Calendar import:** pull renewals in from Google Calendar or Outlook, either by reading the calendars on your phone (any account that syncs to it) or from an ICS link or file.
+- **AI assistant (optional, bring your own Groq key):** *Smart add* turns pasted text into documents, *Ask Countly* answers questions about your documents, plus renewal tips and AI selection of renewal-like calendar events.
 - **19 categories with icons** (passport, visa, ID, licence, vehicle, insurance, health, study, work, home, card, plans, warranty, pet, gov, phone, member, utility, other).
-- **Overdue in days, months or years** (or Auto) — your choice in Settings.
-- **Backup / restore** of your documents from the settings sheet.
-- **12 vibrant colour themes** on a true AMOLED black background, with rounded Material-style design and smooth animations.
-- **Private and offline:** everything is stored on your phone. No account, no server, no tracking.
+- **Overdue in days, months or years** (or Auto) in Settings.
+- **Backup / restore** of your documents, including pasting one document per line.
+- **Private by default:** everything is stored on your phone. No account, no server, no tracking. The only network use is what you switch on yourself (see Privacy).
 - **Made for real life:** quick presets (Passport, Iqama, Visa, Driving licence, Insurance, Exit/Re-entry), Arabic names supported, undo after delete, and the Back button closes sheets before leaving the app.
 
 ## Install on your phone
@@ -73,7 +75,7 @@ The APK is built in the cloud with GitHub Actions:
 | --- | --- |
 | `www/` | The app itself: plain HTML, CSS and JavaScript with no frameworks. |
 | [Capacitor](https://capacitorjs.com) | Wraps `www/` into a real Android app. |
-| `native/` | The Java code for the four home-screen widgets (`WidgetRenderer` draws the dashboards as images) and the bridge that sends them your data. |
+| `native/` | The Java code: the four home-screen widgets (`WidgetRenderer` draws them as images), the daily reminder (`Notifier`, `NotifyReceiver`, `BootReceiver`) and the bridge (`WidgetBridgePlugin`) that carries your data, notification and phone-calendar access. |
 | `scripts/add-widget.js` | Adds the four widget sizes to the generated Android project during the build. |
 | `scripts/add-branding.js` | Adds the app icon (including the Android 13+ themed icon), the black splash screen and the black system bars. |
 | `scripts/add-signing.js` | Signs every build with the same key and gives it a rising version number, so it installs as an update and keeps your data. |
@@ -112,4 +114,11 @@ The build log then says *Signing with the key from GitHub Secrets*. It must be t
 
 ## Privacy
 
-Your documents are stored only on your phone. Countly has no analytics, no account and no server: it never sends your data anywhere.
+Your documents are stored only on your phone. Countly has no analytics, no account and no server of its own.
+
+Three optional things use the network, and only when you use them:
+- **AI features:** when you paste a Groq API key in Settings and use Smart add, the assistant, renewal tips or the calendar AI picker, the relevant document names and dates (or the calendar event titles) are sent to Groq to get an answer. Your key is stored only on your phone. Remove the key to turn AI off.
+- **ICS link import:** fetches the calendar link you paste.
+- **Phone calendar import:** reads your phone's calendars on the device and sends nothing anywhere. It needs the calendar permission.
+
+Notifications use the notification permission and run entirely on the phone.
